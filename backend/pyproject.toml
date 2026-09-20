@@ -1,0 +1,13 @@
+[project]
+name = "pm-backend"
+version = "0.1.0"
+description = "FastAPI backend for the project management MVP"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.115.0",
+  "uvicorn[standard]==0.30.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
