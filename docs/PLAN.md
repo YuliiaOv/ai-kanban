@@ -148,11 +148,11 @@ Success criteria:
 Goal: Replace local in-memory board state with persistent backend API calls so the board remains saved across reloads.
 
 Checklist:
-- [ ] Replace demo-only board state with API-backed fetch and update flows.
-- [ ] Ensure sign-in state and board data coordinate correctly.
-- [ ] Persist card moves, column renames, and card add/delete actions to the backend.
-- [ ] Refresh the UI after each successful mutation.
-- [ ] Run thorough frontend and integration tests for the real persistence flow.
+- [x] Replace demo-only board state with API-backed fetch and update flows.
+- [x] Ensure sign-in state and board data coordinate correctly.
+- [x] Persist card moves, column renames, card edits, and card add/delete actions to the backend.
+- [x] Refresh the UI after each successful mutation.
+- [x] Run thorough frontend and integration tests for the real persistence flow.
 
 Tests and validation for Part 7:
 - Test loading board data from the API.

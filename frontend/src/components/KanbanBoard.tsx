@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,11 +13,19 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
-import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
+import { moveCard, type BoardData } from "@/lib/kanban";
+import {
+  createCard,
+  deleteCard,
+  fetchBoard,
+  renameColumn,
+  updateCard,
+} from "@/lib/boardApi";
 
 export const KanbanBoard = () => {
-  const [board, setBoard] = useState<BoardData>(() => initialData);
+  const [board, setBoard] = useState<BoardData | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -25,69 +33,117 @@ export const KanbanBoard = () => {
     })
   );
 
-  const cardsById = useMemo(() => board.cards, [board.cards]);
+  const cardsById = useMemo(() => board?.cards ?? {}, [board?.cards]);
+
+  useEffect(() => {
+    fetchBoard()
+      .then((loadedBoard) => {
+        setBoard(loadedBoard);
+        setError("");
+      })
+      .catch(() => setError("Unable to load the board."));
+  }, []);
+
+  const refreshBoard = async () => {
+    const loadedBoard = await fetchBoard();
+    setBoard(loadedBoard);
+    setError("");
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveCardId(null);
 
-    if (!over || active.id === over.id) {
+    if (!over || active.id === over.id || !board) {
       return;
     }
 
-    setBoard((prev) => ({
-      ...prev,
-      columns: moveCard(prev.columns, active.id as string, over.id as string),
-    }));
+    const nextColumns = moveCard(board.columns, active.id as string, over.id as string);
+    const nextBoard = { ...board, columns: nextColumns };
+    const destination = nextColumns.find((column) =>
+      column.cardIds.includes(active.id as string)
+    );
+    if (!destination) {
+      return;
+    }
+
+    setBoard(nextBoard);
+    try {
+      await updateCard(active.id as string, {
+        column_id: destination.id,
+        position: destination.cardIds.indexOf(active.id as string),
+      });
+      await refreshBoard();
+    } catch {
+      setError("Unable to save the card move.");
+      await refreshBoard().catch(() => undefined);
+    }
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
-    setBoard((prev) => ({
-      ...prev,
-      columns: prev.columns.map((column) =>
-        column.id === columnId ? { ...column, title } : column
-      ),
-    }));
+    setBoard((prev) =>
+      prev
+        ? {
+            ...prev,
+            columns: prev.columns.map((column) =>
+              column.id === columnId ? { ...column, title } : column
+            ),
+          }
+        : prev
+    );
   };
 
-  const handleAddCard = (columnId: string, title: string, details: string) => {
-    const id = createId("card");
-    setBoard((prev) => ({
-      ...prev,
-      cards: {
-        ...prev.cards,
-        [id]: { id, title, details: details || "No details yet." },
-      },
-      columns: prev.columns.map((column) =>
-        column.id === columnId
-          ? { ...column, cardIds: [...column.cardIds, id] }
-          : column
-      ),
-    }));
+  const handleRenameColumnCommit = async (columnId: string, title: string) => {
+    if (!title.trim()) {
+      return;
+    }
+    try {
+      await renameColumn(columnId, title.trim());
+      await refreshBoard();
+    } catch {
+      setError("Unable to save the column name.");
+      await refreshBoard().catch(() => undefined);
+    }
   };
 
-  const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
-      return {
-        ...prev,
-        cards: Object.fromEntries(
-          Object.entries(prev.cards).filter(([id]) => id !== cardId)
-        ),
-        columns: prev.columns.map((column) =>
-          column.id === columnId
-            ? {
-                ...column,
-                cardIds: column.cardIds.filter((id) => id !== cardId),
-              }
-            : column
-        ),
-      };
-    });
+  const handleAddCard = async (columnId: string, title: string, details: string) => {
+    try {
+      await createCard(columnId, title, details || "No details yet.");
+      await refreshBoard();
+    } catch {
+      setError("Unable to create the card.");
+    }
   };
+
+  const handleDeleteCard = async (_columnId: string, cardId: string) => {
+    try {
+      await deleteCard(cardId);
+      await refreshBoard();
+    } catch {
+      setError("Unable to delete the card.");
+    }
+  };
+
+  const handleEditCard = async (cardId: string, title: string, details: string) => {
+    try {
+      await updateCard(cardId, { title, details });
+      await refreshBoard();
+    } catch {
+      setError("Unable to save the card.");
+    }
+  };
+
+  if (!board) {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-6 py-10 text-sm text-[var(--gray-text)]">
+        {error || "Loading board..."}
+      </main>
+    );
+  }
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
@@ -98,6 +154,11 @@ export const KanbanBoard = () => {
 
       <main className="relative mx-auto flex min-h-screen max-w-[1500px] flex-col gap-10 px-6 pb-16 pt-12">
         <header className="flex flex-col gap-6 rounded-[32px] border border-[var(--stroke)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur">
+          {error ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
@@ -146,8 +207,10 @@ export const KanbanBoard = () => {
                 column={column}
                 cards={column.cardIds.map((cardId) => board.cards[cardId])}
                 onRename={handleRenameColumn}
+                onRenameCommit={handleRenameColumnCommit}
                 onAddCard={handleAddCard}
                 onDeleteCard={handleDeleteCard}
+                onEditCard={handleEditCard}
               />
             ))}
           </section>

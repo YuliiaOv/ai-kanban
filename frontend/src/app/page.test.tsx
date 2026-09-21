@@ -1,6 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { beforeEach, vi } from "vitest";
 import Home from "@/app/page";
+import { initialData } from "@/lib/kanban";
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => structuredClone(initialData),
+    }))
+  );
+});
 
 describe("Home page auth flow", () => {
   it("requires login before showing the board", () => {
@@ -17,7 +30,9 @@ describe("Home page auth flow", () => {
     await userEvent.type(screen.getByLabelText(/^password$/i), "password");
     await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
-    expect(screen.getByRole("heading", { name: /kanban studio/i })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /kanban studio/i })).toBeInTheDocument()
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /log out/i }));
     expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
