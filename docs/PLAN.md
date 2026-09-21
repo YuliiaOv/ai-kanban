@@ -103,10 +103,10 @@ Success criteria:
 Goal: Define a database structure for the Kanban board with future multi-user support in mind while staying within the MVP constraints.
 
 Checklist:
-- [ ] Document the intended database approach and storage model for users, boards, columns, and cards.
-- [ ] Save a draft schema file in JSON format under the docs directory.
-- [ ] Keep the design compatible with SQLite and future multi-user expansion.
-- [ ] Present the schema to the user for approval before backend implementation begins.
+- [x] Document the intended database approach and storage model for users, boards, columns, and cards.
+- [x] Save a draft schema file in JSON format under the docs directory.
+- [x] Keep the design compatible with SQLite and future multi-user expansion.
+- [x] Present the schema to the user for approval before backend implementation begins.
 
 Tests and validation for Part 5:
 - Check schema consistency against the required app features.
@@ -124,11 +124,11 @@ Success criteria:
 Goal: Add backend routes to read and change the board for a signed-in user, with SQLite initialized automatically when missing.
 
 Checklist:
-- [ ] Define the database initialization and migration strategy.
-- [ ] Create the SQLite database if it does not exist.
-- [ ] Implement API routes to fetch the user board.
-- [ ] Implement API routes to update card movement, column renames, and card creation/deletion.
-- [ ] Add backend unit tests covering success and failure scenarios.
+- [x] Define the database initialization and migration strategy.
+- [x] Create the SQLite database if it does not exist.
+- [x] Implement API routes to fetch the user board.
+- [x] Implement API routes to update card movement, column renames, and card creation/deletion.
+- [x] Add backend unit tests covering success and failure scenarios.
 
 Tests and validation for Part 6:
 - Verify database creation on initial startup.

@@ -1,12 +1,48 @@
 from pathlib import Path
+import os
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, Field
+
+from .database import (
+  create_card,
+  delete_card,
+  get_board,
+  initialize_database,
+  rename_column,
+  update_card,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 FRONTEND_BUILD_DIR = PROJECT_ROOT / "frontend" / "out"
 
 app = FastAPI(title="Project Management MVP", version="0.1.0")
+app.state.database_path = Path(
+  os.getenv("PM_DATABASE_PATH", str(PROJECT_ROOT / "data" / "app.db"))
+)
+
+
+class ColumnRename(BaseModel):
+  title: str = Field(min_length=1)
+
+
+class CardCreate(BaseModel):
+  column_id: str
+  title: str = Field(min_length=1)
+  details: str = ""
+
+
+class CardUpdate(BaseModel):
+  title: str | None = Field(default=None, min_length=1)
+  details: str | None = None
+  column_id: str | None = None
+  position: int | None = Field(default=None, ge=0)
+
+
+@app.on_event("startup")
+async def initialize_app_database() -> None:
+  initialize_database(app.state.database_path)
 
 
 def _fallback_root_response() -> str:
@@ -80,6 +116,59 @@ async def health() -> dict[str, str]:
 @app.get("/api/hello")
 async def hello() -> dict[str, str]:
     return {"message": "hello world"}
+
+
+@app.get("/api/board")
+async def read_board() -> dict:
+  try:
+    return get_board(app.state.database_path)
+  except LookupError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.patch("/api/board/columns/{column_id}")
+async def update_column(column_id: str, payload: ColumnRename) -> dict[str, str]:
+  try:
+    rename_column(app.state.database_path, column_id, payload.title)
+  except LookupError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+  return {"status": "updated"}
+
+
+@app.post("/api/board/cards", status_code=201)
+async def add_card(payload: CardCreate) -> dict[str, str]:
+  try:
+    card_id = create_card(
+      app.state.database_path, payload.column_id, payload.title, payload.details
+    )
+  except LookupError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+  return {"id": card_id, "status": "created"}
+
+
+@app.patch("/api/board/cards/{card_id}")
+async def edit_card(card_id: str, payload: CardUpdate) -> dict[str, str]:
+  try:
+    update_card(
+      app.state.database_path,
+      card_id,
+      payload.title,
+      payload.details,
+      payload.column_id,
+      payload.position,
+    )
+  except LookupError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+  return {"status": "updated"}
+
+
+@app.delete("/api/board/cards/{card_id}")
+async def remove_card(card_id: str) -> dict[str, str]:
+  try:
+    delete_card(app.state.database_path, card_id)
+  except LookupError as error:
+    raise HTTPException(status_code=404, detail=str(error)) from error
+  return {"status": "deleted"}
 
 
 @app.get("/{path:path}")
