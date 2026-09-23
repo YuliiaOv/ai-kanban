@@ -1,6 +1,6 @@
 import sqlite3
-from datetime import datetime, timezone
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -24,9 +24,14 @@ INITIAL_CARDS = [
     ("card-8", "Close onboarding sprint", "Document release notes and share internally.", "col-done", 1),
 ]
 
+INSERT_CARD = (
+    "INSERT INTO cards (id, board_id, column_id, title, details, position, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+)
+
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @contextmanager
@@ -90,9 +95,7 @@ def initialize_database(database_path: Path) -> None:
             CREATE INDEX IF NOT EXISTS idx_cards_board_column_position ON cards(board_id, column_id, position);
             """
         )
-        user = connection.execute(
-            "SELECT id FROM users WHERE username = ?", ("user",)
-        ).fetchone()
+        user = connection.execute("SELECT id FROM users WHERE username = ?", ("user",)).fetchone()
         if user is None:
             now = utc_now()
             user_id = str(uuid4())
@@ -110,26 +113,26 @@ def initialize_database(database_path: Path) -> None:
                 [(column_id, board_id, title, position, now, now) for column_id, title, position in INITIAL_COLUMNS],
             )
             connection.executemany(
-                "INSERT INTO cards (id, board_id, column_id, title, details, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [(card_id, board_id, column_id, title, details, position, now, now) for card_id, title, details, column_id, position in INITIAL_CARDS],
+                INSERT_CARD,
+                [
+                    (card_id, board_id, column_id, title, details, position, now, now)
+                    for card_id, title, details, column_id, position in INITIAL_CARDS
+                ],
             )
 
 
-def get_board(database_path: Path) -> dict[str, Any]:
-    with connect(database_path) as connection:
-        board = connection.execute(
-            "SELECT id, name FROM boards ORDER BY created_at LIMIT 1"
-        ).fetchone()
-        if board is None:
-            raise LookupError("No board exists")
-        columns = connection.execute(
-            "SELECT id, title FROM columns WHERE board_id = ? ORDER BY position",
-            (board["id"],),
-        ).fetchall()
-        cards = connection.execute(
-            "SELECT id, title, details, column_id FROM cards WHERE board_id = ? ORDER BY position",
-            (board["id"],),
-        ).fetchall()
+def get_board(connection: sqlite3.Connection) -> dict[str, Any]:
+    board = connection.execute("SELECT id, name FROM boards ORDER BY created_at LIMIT 1").fetchone()
+    if board is None:
+        raise LookupError("No board exists")
+    columns = connection.execute(
+        "SELECT id, title FROM columns WHERE board_id = ? ORDER BY position",
+        (board["id"],),
+    ).fetchall()
+    cards = connection.execute(
+        "SELECT id, title, details, column_id FROM cards WHERE board_id = ? ORDER BY position",
+        (board["id"],),
+    ).fetchall()
 
     cards_by_column = {column["id"]: [] for column in columns}
     card_map = {}
@@ -152,120 +155,92 @@ def get_board(database_path: Path) -> dict[str, Any]:
     }
 
 
-def rename_column(database_path: Path, column_id: str, title: str) -> None:
-    with connect(database_path) as connection:
-        result = connection.execute(
-            "UPDATE columns SET title = ?, updated_at = ? WHERE id = ?",
-            (title, utc_now(), column_id),
-        )
-        if result.rowcount == 0:
-            raise LookupError("Column not found")
+def rename_column(connection: sqlite3.Connection, column_id: str, title: str) -> None:
+    result = connection.execute(
+        "UPDATE columns SET title = ?, updated_at = ? WHERE id = ?",
+        (title, utc_now(), column_id),
+    )
+    if result.rowcount == 0:
+        raise LookupError("Column not found")
 
 
-def create_card(database_path: Path, column_id: str, title: str, details: str) -> str:
+def create_card(connection: sqlite3.Connection, column_id: str, title: str, details: str) -> str:
     card_id = f"card-{uuid4().hex[:12]}"
     now = utc_now()
-    with connect(database_path) as connection:
-        column = connection.execute(
-            "SELECT board_id FROM columns WHERE id = ?", (column_id,)
-        ).fetchone()
-        if column is None:
-            raise LookupError("Column not found")
-        position = connection.execute(
-            "SELECT COALESCE(MAX(position) + 1, 0) FROM cards WHERE column_id = ?",
-            (column_id,),
-        ).fetchone()[0]
-        connection.execute(
-            "INSERT INTO cards (id, board_id, column_id, title, details, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (card_id, column["board_id"], column_id, title, details, position, now, now),
-        )
+    column = connection.execute("SELECT board_id FROM columns WHERE id = ?", (column_id,)).fetchone()
+    if column is None:
+        raise LookupError("Column not found")
+    position = connection.execute(
+        "SELECT COALESCE(MAX(position) + 1, 0) FROM cards WHERE column_id = ?",
+        (column_id,),
+    ).fetchone()[0]
+    connection.execute(
+        INSERT_CARD,
+        (card_id, column["board_id"], column_id, title, details, position, now, now),
+    )
     return card_id
 
 
 def update_card(
-    database_path: Path,
+    connection: sqlite3.Connection,
     card_id: str,
     title: str | None = None,
     details: str | None = None,
     column_id: str | None = None,
     position: int | None = None,
 ) -> None:
-    with connect(database_path) as connection:
-        card = connection.execute(
-            "SELECT board_id, column_id, title, details, position FROM cards WHERE id = ?",
-            (card_id,),
-        ).fetchone()
-        if card is None:
-            raise LookupError("Card not found")
-        target_column_id = column_id or card["column_id"]
-        target_column = connection.execute(
-            "SELECT board_id FROM columns WHERE id = ?", (target_column_id,)
-        ).fetchone()
-        if target_column is None or target_column["board_id"] != card["board_id"]:
-            raise LookupError("Target column not found")
-        now = utc_now()
-        next_title = title if title is not None else card["title"]
-        next_details = details if details is not None else card["details"]
-        is_moving = target_column_id != card["column_id"] or position is not None
-        if not is_moving:
-            connection.execute(
-                "UPDATE cards SET title = ?, details = ?, updated_at = ? WHERE id = ?",
-                (next_title, next_details, now, card_id),
-            )
-            return
+    card = connection.execute(
+        "SELECT board_id, column_id, title, details FROM cards WHERE id = ?",
+        (card_id,),
+    ).fetchone()
+    if card is None:
+        raise LookupError("Card not found")
+    target_column_id = column_id or card["column_id"]
+    target_column = connection.execute("SELECT board_id FROM columns WHERE id = ?", (target_column_id,)).fetchone()
+    if target_column is None or target_column["board_id"] != card["board_id"]:
+        raise LookupError("Target column not found")
+    next_title = title if title is not None else card["title"]
+    next_details = details if details is not None else card["details"]
+    connection.execute(
+        "UPDATE cards SET title = ?, details = ?, updated_at = ? WHERE id = ?",
+        (next_title, next_details, utc_now(), card_id),
+    )
+    if target_column_id == card["column_id"] and position is None:
+        return
 
-        connection.execute("UPDATE cards SET position = -1 WHERE id = ?", (card_id,))
-        normalize_positions(connection, card["column_id"], card_id)
-        if position is None:
-            target_position = connection.execute(
-                "SELECT COUNT(*) FROM cards WHERE column_id = ? AND id != ?",
-                (target_column_id, card_id),
-            ).fetchone()[0]
-        else:
-            card_count = connection.execute(
-                "SELECT COUNT(*) FROM cards WHERE column_id = ? AND id != ?",
-                (target_column_id, card_id),
-            ).fetchone()[0]
-            target_position = min(position, card_count)
-        connection.execute(
-            "UPDATE cards SET position = position + 100000 WHERE column_id = ? AND position >= ? AND id != ?",
-            (target_column_id, target_position, card_id),
+    ordered_ids = [
+        row["id"]
+        for row in connection.execute(
+            "SELECT id FROM cards WHERE column_id = ? AND id != ? ORDER BY position",
+            (target_column_id, card_id),
         )
-        connection.execute(
-            "UPDATE cards SET position = position - 99999 WHERE column_id = ? AND position >= ? AND id != ?",
-            (target_column_id, target_position + 100000, card_id),
-        )
-        connection.execute(
-            "UPDATE cards SET title = ?, details = ?, column_id = ?, position = ?, updated_at = ? WHERE id = ?",
-            (next_title, next_details, target_column_id, target_position, now, card_id),
-        )
-        normalize_positions(connection, target_column_id)
-
-
-def delete_card(database_path: Path, card_id: str) -> None:
-    with connect(database_path) as connection:
-        card = connection.execute(
-            "SELECT column_id FROM cards WHERE id = ?", (card_id,)
-        ).fetchone()
-        if card is None:
-            raise LookupError("Card not found")
-        connection.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+    ]
+    ordered_ids.insert(len(ordered_ids) if position is None else min(position, len(ordered_ids)), card_id)
+    # Two passes (temporary negative positions first) so no step violates UNIQUE(column_id, position).
+    connection.executemany(
+        "UPDATE cards SET column_id = ?, position = ? WHERE id = ?",
+        [(target_column_id, -index - 1, ordered_id) for index, ordered_id in enumerate(ordered_ids)],
+    )
+    connection.executemany(
+        "UPDATE cards SET position = ? WHERE id = ?",
+        [(index, ordered_id) for index, ordered_id in enumerate(ordered_ids)],
+    )
+    if target_column_id != card["column_id"]:
         normalize_positions(connection, card["column_id"])
 
 
-def normalize_positions(
-    connection: sqlite3.Connection, column_id: str, exclude_card_id: str | None = None
-) -> None:
-    query = "SELECT id FROM cards WHERE column_id = ?"
-    parameters: tuple[str, ...] = (column_id,)
-    if exclude_card_id is not None:
-        query += " AND id != ?"
-        parameters += (exclude_card_id,)
-    query += " ORDER BY position, id"
+def delete_card(connection: sqlite3.Connection, card_id: str) -> None:
+    card = connection.execute("SELECT column_id FROM cards WHERE id = ?", (card_id,)).fetchone()
+    if card is None:
+        raise LookupError("Card not found")
+    connection.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+    normalize_positions(connection, card["column_id"])
+
+
+def normalize_positions(connection: sqlite3.Connection, column_id: str) -> None:
+    # Renumber in ascending order; each card only moves down into a free slot, so no UNIQUE clash.
     cards = connection.execute(
-        query, parameters
+        "SELECT id FROM cards WHERE column_id = ? ORDER BY position, id", (column_id,)
     ).fetchall()
     for position, card in enumerate(cards):
-        connection.execute(
-            "UPDATE cards SET position = ? WHERE id = ?", (position, card["id"])
-        )
+        connection.execute("UPDATE cards SET position = ? WHERE id = ?", (position, card["id"]))

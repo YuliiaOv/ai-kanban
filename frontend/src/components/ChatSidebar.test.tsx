@@ -27,9 +27,12 @@ describe("ChatSidebar", () => {
 
     expect(await screen.findByText("Keep the current focus.")).toBeInTheDocument();
     expect(refreshBoard).not.toHaveBeenCalled();
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      message: "What should I focus on?",
-    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.message).toBe("What should I focus on?");
+    // The current message is sent once, not repeated at the end of the history.
+    expect(body.history.map((item: { content: string }) => item.content)).not.toContain(
+      "What should I focus on?"
+    );
   });
 
   it("refreshes the board after an AI mutation", async () => {

@@ -8,6 +8,8 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  pointerWithin,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -22,6 +24,13 @@ import {
   renameColumn,
   updateCard,
 } from "@/lib/boardApi";
+
+// closestCorners alone ranks a tall empty column below nearby cards in other columns,
+// so prefer whatever is under the pointer and fall back to corners otherwise.
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  return pointerCollisions.length > 0 ? pointerCollisions : closestCorners(args);
+};
 
 export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData | null>(null);
@@ -100,6 +109,7 @@ export const KanbanBoard = () => {
 
   const handleRenameColumnCommit = async (columnId: string, title: string) => {
     if (!title.trim()) {
+      await refreshBoard().catch(() => setError("Unable to load the board."));
       return;
     }
     try {
@@ -113,14 +123,14 @@ export const KanbanBoard = () => {
 
   const handleAddCard = async (columnId: string, title: string, details: string) => {
     try {
-      await createCard(columnId, title, details || "No details yet.");
+      await createCard(columnId, title, details);
       await refreshBoard();
     } catch {
       setError("Unable to create the card.");
     }
   };
 
-  const handleDeleteCard = async (_columnId: string, cardId: string) => {
+  const handleDeleteCard = async (cardId: string) => {
     try {
       await deleteCard(cardId);
       await refreshBoard();
@@ -198,7 +208,7 @@ export const KanbanBoard = () => {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >

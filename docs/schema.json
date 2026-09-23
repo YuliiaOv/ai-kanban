@@ -191,8 +191,8 @@
     }
   },
   "approval": {
-    "status": "draft",
-    "implementationBlockedUntilApproved": true,
-    "requestedDecision": "Approve this schema before Part 6 database initialization and persistence API implementation."
+    "status": "approved",
+    "implementationBlockedUntilApproved": false,
+    "decision": "Approved in Part 5 before database implementation began."
   }
 }

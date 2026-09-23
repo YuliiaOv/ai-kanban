@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, vi } from "vitest";
 import { KanbanBoard } from "@/components/KanbanBoard";
-import { initialData, type BoardData } from "@/lib/kanban";
+import type { BoardData } from "@/lib/kanban";
+import { initialData } from "@/test/boardFixture";
 
 let serverBoard: BoardData;
 
@@ -74,6 +75,16 @@ describe("KanbanBoard", () => {
     expect(input).toHaveValue("New Name");
   });
 
+  it("restores the saved column title when it is cleared", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
+    const input = within(getFirstColumn()).getByLabelText("Column title");
+    await userEvent.clear(input);
+    input.blur();
+
+    await waitFor(() => expect(input).toHaveValue("Backlog"));
+  });
+
   it("adds and removes a card", async () => {
     render(<KanbanBoard />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
@@ -117,5 +128,26 @@ describe("KanbanBoard", () => {
     await waitFor(() =>
       expect(within(column).getByText("Updated roadmap themes")).toBeInTheDocument()
     );
+  });
+
+  it("opens the edit form with the latest card values after a refresh", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
+    const column = getFirstColumn();
+    const card = within(column).getByTestId("card-card-1");
+
+    // Open and cancel once, so the card has mounted with its original values.
+    await userEvent.click(within(card).getByRole("button", { name: /edit/i }));
+    await userEvent.click(within(card).getByRole("button", { name: /cancel/i }));
+
+    // The card changes elsewhere (e.g. by the AI); any board refresh picks it up.
+    serverBoard.cards["card-1"].title = "Changed by AI";
+    const columnTitle = within(column).getByLabelText("Column title");
+    await userEvent.type(columnTitle, "!");
+    columnTitle.blur();
+    await waitFor(() => expect(within(column).getByText("Changed by AI")).toBeInTheDocument());
+
+    await userEvent.click(within(card).getByRole("button", { name: /edit/i }));
+    expect(within(card).getByRole("textbox", { name: /edit .* title/i })).toHaveValue("Changed by AI");
   });
 });

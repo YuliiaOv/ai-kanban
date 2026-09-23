@@ -109,7 +109,7 @@ export default function Home() {
 
             <button
               type="submit"
-              className="w-full rounded-full bg-[var(--purple-secondary)] px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90"
+              className="w-full rounded-full bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90"
             >
               Sign In
             </button>

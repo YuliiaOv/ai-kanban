@@ -24,7 +24,7 @@ export default defineConfig({
   },
   // Runs the real stack: FastAPI serving the static export, backed by a fresh SQLite file.
   webServer: {
-    command: `npm --prefix frontend run build && python -m uvicorn backend.app.main:app --host 127.0.0.1 --port ${PORT}`,
+    command: `npm --prefix frontend run build && uv run --project backend uvicorn backend.app.main:app --host 127.0.0.1 --port ${PORT}`,
     cwd: "..",
     url: `http://127.0.0.1:${PORT}/api/health`,
     env: { PM_DATABASE_PATH: path.join(tmpdir(), `pm-e2e-${Date.now()}.db`) },

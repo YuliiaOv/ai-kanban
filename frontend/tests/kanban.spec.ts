@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const signIn = async (page: Page) => {
   await page.goto("/");
@@ -14,6 +14,24 @@ const reloadAndSignIn = async (page: Page) => {
   await page.reload();
   await signIn(page);
 };
+
+const drag = async (page: Page, from: Locator, to: Locator, offsetY: number) => {
+  const fromBox = await from.boundingBox();
+  const toBox = await to.boundingBox();
+  if (!fromBox || !toBox) {
+    throw new Error("Unable to resolve drag coordinates.");
+  }
+  await page.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(toBox.x + toBox.width / 2, toBox.y + offsetY, { steps: 15 });
+  await page.mouse.up();
+};
+
+const cardIdsIn = (page: Page, columnId: string) =>
+  page
+    .getByTestId(`column-${columnId}`)
+    .locator('[data-testid^="card-"]')
+    .evaluateAll((cards) => cards.map((card) => card.getAttribute("data-testid")));
 
 test("rejects invalid credentials", async ({ page }) => {
   await page.goto("/");
@@ -94,6 +112,46 @@ test("moves a card between columns and keeps it after reload", async ({ page }) 
 
   await reloadAndSignIn(page);
   await expect(page.getByTestId("column-col-review").getByTestId("card-card-1")).toBeVisible();
+});
+
+test("drops a card into an empty column and keeps it after reload", async ({ page }) => {
+  // Empty the Discovery column; its only card is card-3.
+  await page.request.patch("/api/board/cards/card-3", { data: { column_id: "col-backlog" } });
+  await signIn(page);
+  const discovery = page.getByTestId("column-col-discovery");
+  await expect(discovery.getByText("Drop a card here")).toBeVisible();
+
+  await drag(page, page.getByTestId("card-card-4"), discovery, 80);
+  await expect(discovery.getByTestId("card-card-4")).toBeVisible();
+
+  await reloadAndSignIn(page);
+  await expect(page.getByTestId("column-col-discovery").getByTestId("card-card-4")).toBeVisible();
+});
+
+test("reorders cards within a column and keeps the order after reload", async ({ page }) => {
+  // New cards land at the bottom of a tall column; page.mouse does not scroll, so keep them on screen.
+  await page.setViewportSize({ width: 1280, height: 1600 });
+  for (const title of ["Reorder A", "Reorder B"]) {
+    await page.request.post("/api/board/cards", { data: { column_id: "col-progress", title, details: "" } });
+  }
+  await signIn(page);
+  const column = page.getByTestId("column-col-progress");
+  const cardA = column.locator("article", { hasText: "Reorder A" });
+  const cardB = column.locator("article", { hasText: "Reorder B" });
+  const idA = await cardA.getAttribute("data-testid");
+  const idB = await cardB.getAttribute("data-testid");
+  const before = await cardIdsIn(page, "col-progress");
+  expect(before.indexOf(idA)).toBeLessThan(before.indexOf(idB));
+
+  await drag(page, cardB, cardA, 10);
+  await expect.poll(async () => {
+    const ids = await cardIdsIn(page, "col-progress");
+    return ids.indexOf(idB) < ids.indexOf(idA);
+  }).toBe(true);
+
+  await reloadAndSignIn(page);
+  const after = await cardIdsIn(page, "col-progress");
+  expect(after.indexOf(idB)).toBeLessThan(after.indexOf(idA));
 });
 
 test("shows a text-only AI reply", async ({ page }) => {

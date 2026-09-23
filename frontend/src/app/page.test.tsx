@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, vi } from "vitest";
 import Home from "@/app/page";
-import { initialData } from "@/lib/kanban";
+import { initialData } from "@/test/boardFixture";
 
 beforeEach(() => {
   vi.stubGlobal(

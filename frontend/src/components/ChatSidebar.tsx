@@ -26,7 +26,8 @@ export const ChatSidebar = ({ onBoardUpdated }: ChatSidebarProps) => {
     setError("");
     setIsSending(true);
     try {
-      const response = await sendChatMessage(message, nextMessages);
+      // History is the earlier turns; the backend appends the current message itself.
+      const response = await sendChatMessage(message, messages);
       setMessages((current) => [...current, { role: "assistant", content: response.message }]);
       if (response.board_updated) {
         await onBoardUpdated();
