@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.115.0",
   "uvicorn[standard]==0.30.6",
+  "pytest==8.3.3",
 ]
 
 [build-system]

@@ -1,17 +1,17 @@
 # Project plan
 
-Status: Draft for approval before implementation begins.
+Status: Parts 1-10 implementation complete; browser validation pending.
 
 ## Part 1: Planning and project framing
 
 Goal: Confirm the working scope, align the repo structure to the product requirements, and define execution checkpoints before starting code changes.
 
 Checklist:
-- [ ] Review the root project instructions in [AGENTS.md](../AGENTS.md) and confirm the product scope, constraints, and technology decisions.
-- [ ] Review the current frontend project structure and confirm the existing demo Kanban implementation that will be built on.
-- [ ] Create a detailed execution plan for each remaining phase with verification steps and success criteria.
-- [ ] Create a frontend-specific agent guide in [frontend/AGENTS.md](../frontend/AGENTS.md) describing the current app layout, data model, and testing setup.
-- [ ] Present the plan to the user for approval before any implementation work is started.
+- [x] Review the root project instructions in [AGENTS.md](../AGENTS.md) and confirm the product scope, constraints, and technology decisions.
+- [x] Review the current frontend project structure and confirm the existing demo Kanban implementation that will be built on.
+- [x] Create a detailed execution plan for each remaining phase with verification steps and success criteria.
+- [x] Create a frontend-specific agent guide in [frontend/AGENTS.md](../frontend/AGENTS.md) describing the current app layout, data model, and testing setup.
+- [x] Present the plan to the user for approval before any implementation work is started.
 
 Tests and validation for Part 1:
 - Confirm the plan includes explicit test coverage expectations for every phase.
@@ -30,12 +30,12 @@ Success criteria:
 Goal: Create the Dockerized local environment and the FastAPI backend shell so the app can run in a container and serve a basic proof-of-life endpoint.
 
 Checklist:
-- [ ] Create or update the Docker configuration for the app stack.
-- [ ] Set up the backend project structure in [backend](../backend) using FastAPI.
-- [ ] Add Python dependency management with uv and confirm the correct package installation flow in Docker.
-- [ ] Create start and stop scripts in [scripts](../scripts) for Mac, PC, and Linux.
-- [ ] Serve a minimal hello-world page at the app root to confirm the stack runs locally.
-- [ ] Create a basic API endpoint that returns a simple success payload and verify it works from the running app.
+- [x] Create or update the Docker configuration for the app stack.
+- [x] Set up the backend project structure in [backend](../backend) using FastAPI.
+- [x] Add Python dependency management with uv and confirm the correct package installation flow in Docker.
+- [x] Create start and stop scripts in [scripts](../scripts) for Mac, PC, and Linux.
+- [x] Serve a minimal hello-world page at the app root to confirm the stack runs locally.
+- [x] Create a basic API endpoint that returns a simple success payload and verify it works from the running app.
 
 Tests and validation for Part 2:
 - Run the app locally via the scripts.
@@ -55,11 +55,11 @@ Success criteria:
 Goal: Make the frontend build as a static app and serve it from the backend so the Kanban demo is visible at the root URL.
 
 Checklist:
-- [ ] Confirm the Next.js app can build successfully in production mode.
-- [ ] Update the app so it can be served by the backend from the root path.
-- [ ] Ensure the demo Kanban board renders at / as the primary application entry point.
-- [ ] Run frontend unit tests and integration tests for the board UI.
-- [ ] Verify the app loads correctly in the browser without requiring the standalone dev server.
+- [x] Confirm the Next.js app can build successfully in production mode.
+- [x] Update the app so it can be served by the backend from the root path.
+- [x] Ensure the demo Kanban board renders at / as the primary application entry point.
+- [x] Run frontend unit tests and integration tests for the board UI.
+- [x] Verify the app loads correctly in the browser without requiring the standalone dev server.
 
 Tests and validation for Part 3:
 - Run the frontend test suite.
@@ -79,11 +79,11 @@ Success criteria:
 Goal: Add a basic login gate using the hardcoded credentials user / password before the Kanban can be accessed.
 
 Checklist:
-- [ ] Add a login screen before the board is visible.
-- [ ] Implement a simple in-memory auth flow with the required dummy credentials.
-- [ ] Add logout behavior and ensure the user is returned to the sign-in experience.
-- [ ] Restrict access to the board until authentication succeeds.
-- [ ] Add tests covering both valid and invalid login attempts.
+- [x] Add a login screen before the board is visible.
+- [x] Implement a simple in-memory auth flow with the required dummy credentials.
+- [x] Add logout behavior and ensure the user is returned to the sign-in experience.
+- [x] Restrict access to the board until authentication succeeds.
+- [x] Add tests covering both valid and invalid login attempts.
 
 Tests and validation for Part 4:
 - Test successful login with user / password.
@@ -127,7 +127,7 @@ Checklist:
 - [x] Define the database initialization and migration strategy.
 - [x] Create the SQLite database if it does not exist.
 - [x] Implement API routes to fetch the user board.
-- [x] Implement API routes to update card movement, column renames, and card creation/deletion.
+- [x] Implement API routes to update card movement, column renames, card creation/editing, and deletion.
 - [x] Add backend unit tests covering success and failure scenarios.
 
 Tests and validation for Part 6:
@@ -172,15 +172,15 @@ Success criteria:
 Goal: Establish a working OpenRouter integration and verify the backend can call the configured model successfully.
 
 Checklist:
-- [ ] Add backend support for the configured OpenRouter API key and model.
-- [ ] Ensure the application handles environment configuration cleanly.
-- [ ] Make a minimal test request such as 2 + 2.
-- [ ] Confirm the response can be parsed and surfaced as valid output.
+- [x] Add backend support for the configured OpenRouter API key and model.
+- [x] Ensure the application handles environment configuration cleanly.
+- [x] Make a minimal test request such as 2 + 2.
+- [x] Confirm the response can be parsed and surfaced as valid output.
 
 Tests and validation for Part 8:
-- Run a minimal AI call via the backend.
-- Confirm the response is successful and returns expected output.
-- Validate failure handling for missing/invalid API configuration.
+- [x] Run a minimal AI call via the backend using the configured OpenRouter provider.
+- [x] Confirm the live response is successfully parsed and returned by the client (`4`, with no board operations).
+- [x] Validate failure handling for missing/invalid API configuration.
 
 Success criteria:
 - The backend can call the LLM successfully via OpenRouter.
@@ -193,17 +193,17 @@ Success criteria:
 Goal: Send the board JSON, the user message, and conversation context to the AI and require structured output with both a user-facing response and optional board updates.
 
 Checklist:
-- [ ] Expand the backend AI request payload to include the current board state and chat history.
-- [ ] Define a structured response schema with a message and optional Kanban changes.
-- [ ] Validate the AI output against the expected schema.
-- [ ] Apply optional board updates with safety checks.
-- [ ] Add thorough tests covering both normal and malformed AI responses.
+- [x] Expand the backend AI request payload to include the current board state and chat history.
+- [x] Define a structured response schema with a message and optional Kanban changes.
+- [x] Validate the AI output against the expected schema.
+- [x] Apply optional board updates with safety checks.
+- [x] Add thorough tests covering both normal and malformed AI responses.
 
 Tests and validation for Part 9:
-- Test a chat prompt that requires only a text answer.
-- Test a prompt that requires a small board update.
-- Test invalid or incomplete AI output handling.
-- Confirm the app can parse and apply structured updates safely.
+- [x] Test a chat prompt that requires only a text answer.
+- [x] Test a prompt that requires a small board update.
+- [x] Test invalid or incomplete AI output handling.
+- [x] Confirm the app can parse and apply structured updates safely.
 
 Success criteria:
 - The AI receives enough context to reason about the board.
@@ -217,17 +217,17 @@ Success criteria:
 Goal: Deliver the final user experience: a side-panel chat interface with AI-powered board updates that immediately refresh the UI.
 
 Checklist:
-- [ ] Build a sidebar chat UI in the frontend with conversation history and input controls.
-- [ ] Wire the frontend to the backend AI endpoint.
-- [ ] Allow the AI to send structured board updates when appropriate.
-- [ ] Refresh the UI automatically whenever the board is updated by the AI.
-- [ ] Run end-to-end tests covering the AI-assisted workflow.
+- [x] Build a sidebar chat UI in the frontend with conversation history and input controls.
+- [x] Wire the frontend to the backend AI endpoint.
+- [x] Allow the AI to send structured board updates when appropriate.
+- [x] Refresh the UI automatically whenever the board is updated by the AI.
+- [x] Run end-to-end tests covering the AI-assisted workflow.
 
 Tests and validation for Part 10:
-- Test sending a prompt to the AI through the UI.
-- Test a board-changing AI response updates the UI automatically.
-- Test that non-mutating AI responses still display correctly.
-- Verify the experience works from a user perspective.
+- [ ] Test sending a prompt to the AI through the UI in a browser.
+- [ ] Test a board-changing AI response updates the UI automatically in a browser.
+- [x] Test sending a prompt, displaying a text response, and refreshing after a board update in component tests.
+- [ ] Verify the experience works from a user perspective in a browser.
 
 Success criteria:
 - The user can chat with the AI from the sidebar.
@@ -241,6 +241,30 @@ Success criteria:
 The work must proceed in the order above. Each phase builds on the previous one and must not skip the required user approval checkpoints for planning, schema approval, and final scope confirmation.
 
 The implementation should remain intentionally simple, avoid unnecessary abstraction, and keep the codebase aligned with the MVP constraints described in [AGENTS.md](../AGENTS.md).
+
+## Current design decisions
+
+- The frontend is built as a Next.js static export and served by FastAPI from the same Docker container; the browser calls backend routes under `/api`.
+- The MVP sign-in remains client-side and in-memory with the hardcoded credentials `user` / `password`. It gates the board experience but is not production authentication or an API security boundary.
+- SQLite is accessed through Python's standard-library `sqlite3` module. Database initialization creates the schema and seeds the MVP user, one board, five columns, and eight cards when the database is missing.
+- The relational schema is documented in [docs/schema.json](schema.json): users own boards, boards own ordered columns and cards, and card placement is represented by `column_id` plus `position`.
+- The MVP enforces one board per user with a database uniqueness constraint, while retaining user and board ownership fields for future multi-user expansion.
+- Board persistence is exposed through `GET /api/board`, column rename, and card create/update/move/delete endpoints. The frontend refreshes board state from the API after successful mutations.
+- Docker mounts `./data` to `/app/data` so the SQLite database survives image rebuilds and container recreation. Generated database files are excluded from version control.
+- Part 7 currently uses a fixed MVP backend board scope. A future authenticated request context must replace that scope before multi-user isolation is considered complete.
+
+## Validation record
+
+- Part 1: planning and frontend guide completed and approved before implementation.
+- Part 2: Docker/FastAPI baseline and proof-of-life endpoints validated.
+- Part 3: static frontend build and backend serving validated.
+- Part 4: sign-in, invalid credentials, logout, and password visibility covered by frontend tests.
+- Part 5: [docs/schema.json](schema.json) approved before persistence implementation.
+- Part 6: backend suite passes with database initialization, CRUD, movement, ordering, and error coverage.
+- Part 7: frontend suite passes with API loading, rename, create, edit, delete, refresh, and Docker live API verification.
+- Part 8: backend chat route, missing-key handling, and structured OpenRouter client implemented; live smoke test returned `4` successfully.
+- Part 9: structured `create`, `update`, `move`, and `delete` operations validated before application; parser tests cover board context, chat history, and malformed operation responses.
+- Part 10: sidebar chat UI and automatic board refresh implemented; frontend unit tests and production build pass. Playwright validation is pending installation of the local Chromium binary.
 
 ## Definition of done for the overall project
 

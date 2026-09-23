@@ -1,7 +1,24 @@
 import pytest
+import json
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
 from app.main import app
+from app.ai import ChatRequest, ChatResult, OpenRouterError, request_openrouter
+
+
+class FakeOpenRouterResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload).encode("utf-8")
 
 
 @pytest.fixture
@@ -74,3 +91,81 @@ def test_board_mutations_return_not_found(client):
     assert client.post(
         "/api/board/cards", json={"column_id": "missing", "title": "Nope"}
     ).status_code == 404
+
+
+def test_chat_applies_structured_operations(client):
+    result = ChatResult(
+        message="I added the task.",
+        operations=[
+            {"type": "create", "column_id": "col-backlog", "title": "AI task", "details": "Created by chat"},
+            {"type": "move", "card_id": "card-1", "column_id": "col-progress", "position": 0},
+        ],
+    )
+    with patch("app.main.request_openrouter", return_value=result):
+        response = client.post("/api/chat", json={"message": "Add a task and move card-1"})
+
+    assert response.status_code == 200
+    assert response.json()["board_updated"] is True
+    board = client.get("/api/board").json()
+    assert any(card["title"] == "AI task" for card in board["cards"].values())
+    assert board["columns"][2]["cardIds"][0] == "card-1"
+
+
+def test_chat_rejects_invalid_operations_without_mutating_board(client):
+    result = ChatResult(
+        message="I could not complete that.",
+        operations=[{"type": "move", "card_id": "missing", "column_id": "col-done", "position": 0}],
+    )
+    with patch("app.main.request_openrouter", return_value=result):
+        response = client.post("/api/chat", json={"message": "Move a missing card"})
+
+    assert response.status_code == 502
+    assert len(client.get("/api/board").json()["cards"]) == 8
+
+
+def test_chat_reports_missing_ai_configuration(client, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    response = client.post("/api/chat", json={"message": "What should I do next?"})
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "OPENROUTER_API_KEY is not configured."
+
+
+def test_openrouter_parser_sends_board_and_history(monkeypatch):
+    captured = {}
+    board = {"id": "board-1", "columns": [], "cards": {}}
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data)
+        captured["timeout"] = timeout
+        return FakeOpenRouterResponse(
+            {"choices": [{"message": {"content": '{"message":"4","operations":[]}'}}]}
+        )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    with patch("app.ai.urlopen", side_effect=fake_urlopen):
+        result = request_openrouter(
+            board,
+            ChatRequest(
+                message="What is 2 + 2?",
+                history=[{"role": "assistant", "content": "We are planning."}],
+            ),
+        )
+
+    assert result.message == "4"
+    assert captured["timeout"] == 60
+    assert json.dumps(board) in captured["body"]["messages"][1]["content"]
+    assert captured["body"]["messages"][2]["content"] == "We are planning."
+    assert captured["body"]["messages"][3]["content"] == "What is 2 + 2?"
+
+
+def test_openrouter_parser_rejects_malformed_structured_response(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    response = FakeOpenRouterResponse(
+        {"choices": [{"message": {"content": '{"message":"bad operation","operations":[{"type":"archive"}]}'}}]}
+    )
+
+    with patch("app.ai.urlopen", return_value=response):
+        with pytest.raises(OpenRouterError, match="invalid structured response"):
+            request_openrouter({}, ChatRequest(message="Do something"))

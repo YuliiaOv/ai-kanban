@@ -13,6 +13,7 @@ from .database import (
   rename_column,
   update_card,
 )
+from .ai import ChatRequest, ChatResult, OpenRouterError, apply_operations, request_openrouter
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 FRONTEND_BUILD_DIR = PROJECT_ROOT / "frontend" / "out"
@@ -116,6 +117,17 @@ async def health() -> dict[str, str]:
 @app.get("/api/hello")
 async def hello() -> dict[str, str]:
     return {"message": "hello world"}
+
+
+@app.post("/api/chat")
+async def chat(payload: ChatRequest) -> ChatResult:
+  try:
+    result = request_openrouter(get_board(app.state.database_path), payload)
+    apply_operations(app.state.database_path, result.operations)
+  except (LookupError, OpenRouterError) as error:
+    raise HTTPException(status_code=502, detail=str(error)) from error
+  result.board_updated = bool(result.operations)
+  return result
 
 
 @app.get("/api/board")

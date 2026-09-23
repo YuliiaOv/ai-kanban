@@ -10,6 +10,8 @@ This folder contains the current Next.js frontend for the Kanban MVP. The app is
 - components/KanbanCard.tsx: draggable card element used inside columns.
 - components/KanbanCardPreview.tsx: preview shown while dragging a card.
 - components/NewCardForm.tsx: form used to create a new card in a column.
+- components/ChatSidebar.tsx: AI conversation panel that sends chat requests and refreshes the board after AI mutations.
+- lib/chatApi.ts: client contract for `POST /api/chat`.
 - lib/kanban.ts: board data model, initial seed data, and drag/drop logic.
 
 ## Current behavior
@@ -20,7 +22,9 @@ The frontend currently demonstrates a single-board Kanban experience with:
 - Drag-and-drop card movement between columns and within a column
 - Add-card flow per column
 - Delete-card action per card
-- In-memory board state only; no persistence or auth flow yet
+- Board state loaded from and persisted to the FastAPI backend
+- Client-side sign-in gate using the MVP `user` / `password` credentials
+- AI chat sidebar connected to the backend chat route
 
 ## Data model
 
