@@ -18,7 +18,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir uv
 
 COPY backend/pyproject.toml ./backend/pyproject.toml
-RUN uv pip install --system --no-cache-dir "fastapi==0.115.0" "uvicorn[standard]==0.30.6" "pytest==8.3.3"
+RUN uv pip install --system --no-cache-dir -r backend/pyproject.toml
 
 COPY backend ./backend
 COPY --from=frontend-builder /app/frontend/out ./frontend/out

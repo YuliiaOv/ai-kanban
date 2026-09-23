@@ -1,6 +1,6 @@
 # Project plan
 
-Status: Parts 1-10 implementation complete; browser validation pending.
+Status: Parts 1-10 complete; unit, backend, and Playwright end-to-end suites pass.
 
 ## Part 1: Planning and project framing
 
@@ -224,10 +224,10 @@ Checklist:
 - [x] Run end-to-end tests covering the AI-assisted workflow.
 
 Tests and validation for Part 10:
-- [ ] Test sending a prompt to the AI through the UI in a browser.
-- [ ] Test a board-changing AI response updates the UI automatically in a browser.
+- [x] Test sending a prompt to the AI through the UI in a browser.
+- [x] Test a board-changing AI response updates the UI automatically in a browser.
 - [x] Test sending a prompt, displaying a text response, and refreshing after a board update in component tests.
-- [ ] Verify the experience works from a user perspective in a browser.
+- [x] Verify the experience works from a user perspective in a browser.
 
 Success criteria:
 - The user can chat with the AI from the sidebar.
@@ -264,7 +264,8 @@ The implementation should remain intentionally simple, avoid unnecessary abstrac
 - Part 7: frontend suite passes with API loading, rename, create, edit, delete, refresh, and Docker live API verification.
 - Part 8: backend chat route, missing-key handling, and structured OpenRouter client implemented; live smoke test returned `4` successfully.
 - Part 9: structured `create`, `update`, `move`, and `delete` operations validated before application; parser tests cover board context, chat history, and malformed operation responses.
-- Part 10: sidebar chat UI and automatic board refresh implemented; frontend unit tests and production build pass. Playwright validation is pending installation of the local Chromium binary.
+- Part 10: sidebar chat UI and automatic board refresh implemented; frontend unit tests and production build pass. Playwright suite (10 tests) runs against FastAPI serving the static build with a fresh SQLite file per run and covers sign-in, card add/edit/delete, column rename, drag and drop (each verified after reload), AI chat replies, AI-driven board refresh, and a live OpenRouter card creation. Fixed a card layout overflow found by e2e: card action buttons spilled out of narrow columns and were covered by the chat sidebar.
+- Docker: image builds and starts via `scripts/start.ps1`; container serves the frontend and API, receives `OPENROUTER_API_KEY` from `.env`, persists data across restarts through the `./data` volume, and passes the backend suite; `scripts/stop.ps1` removes it. The Dockerfile now installs dependencies from `backend/pyproject.toml` (added missing `httpx`). AI chat switched from `json_object` to strict `json_schema` output after live testing showed frequent malformed replies; OpenRouter provider errors are now reported with their real cause. The live Playwright AI test skips when the free provider reports it is overloaded.
 
 ## Definition of done for the overall project
 

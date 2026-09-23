@@ -158,6 +158,30 @@ def test_openrouter_parser_sends_board_and_history(monkeypatch):
     assert json.dumps(board) in captured["body"]["messages"][1]["content"]
     assert captured["body"]["messages"][2]["content"] == "We are planning."
     assert captured["body"]["messages"][3]["content"] == "What is 2 + 2?"
+    assert captured["body"]["response_format"]["type"] == "json_schema"
+    assert captured["body"]["response_format"]["json_schema"]["strict"] is True
+
+
+def test_openrouter_parser_reports_provider_error(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    response = FakeOpenRouterResponse(
+        {"error": {"message": "Upstream error from Nvidia: Service temporarily overloaded", "code": 503}}
+    )
+
+    with patch("app.ai.urlopen", return_value=response):
+        with pytest.raises(OpenRouterError, match="Service temporarily overloaded"):
+            request_openrouter({}, ChatRequest(message="Do something"))
+
+
+def test_openrouter_parser_reports_failed_generation(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    response = FakeOpenRouterResponse(
+        {"choices": [{"finish_reason": "error", "message": {"content": None}}]}
+    )
+
+    with patch("app.ai.urlopen", return_value=response):
+        with pytest.raises(OpenRouterError, match="failed while generating"):
+            request_openrouter({}, ChatRequest(message="Do something"))
 
 
 def test_openrouter_parser_rejects_malformed_structured_response(monkeypatch):

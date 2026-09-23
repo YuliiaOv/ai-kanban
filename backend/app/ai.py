@@ -41,14 +41,41 @@ class OpenRouterError(Exception):
     super().__init__(self.message)
 
 
+NULLABLE_STRING = {"type": ["string", "null"]}
+
+# Strict structured output: every field is required, optional values are null.
+RESPONSE_SCHEMA = {
+  "type": "object",
+  "additionalProperties": False,
+  "required": ["message", "operations"],
+  "properties": {
+    "message": {"type": "string"},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["type", "card_id", "column_id", "title", "details", "position"],
+        "properties": {
+          "type": {"type": "string", "enum": ["create", "update", "move", "delete"]},
+          "card_id": NULLABLE_STRING,
+          "column_id": NULLABLE_STRING,
+          "title": NULLABLE_STRING,
+          "details": NULLABLE_STRING,
+          "position": {"type": ["integer", "null"]},
+        },
+      },
+    },
+  },
+}
+
+
 def _system_prompt() -> str:
   return (
-    "You are a project management assistant. Return only valid JSON with this shape: "
-    '{"message":"string","operations":[{"type":"create|update|move|delete",'
-    '"card_id":"optional","column_id":"optional","title":"optional",'
-    '"details":"optional","position":0}]}. '
+    "You are a project management assistant. Reply with a user-facing message and a list of board operations. "
     "Use create with column_id, title, and details; update with card_id and changed fields; "
     "move with card_id, column_id, and position; delete with card_id. "
+    "Set operation fields that do not apply to null. "
     "Use an empty operations array for conversation that does not change the board."
   )
 
@@ -66,7 +93,10 @@ def request_openrouter(board: dict, payload: ChatRequest) -> ChatResult:
       *payload.history,
       {"role": "user", "content": payload.message},
     ],
-    "response_format": {"type": "json_object"},
+    "response_format": {
+      "type": "json_schema",
+      "json_schema": {"name": "chat_result", "strict": True, "schema": RESPONSE_SCHEMA},
+    },
   }
   request = Request(
     OPENROUTER_URL,
@@ -85,8 +115,16 @@ def request_openrouter(board: dict, payload: ChatRequest) -> ChatResult:
   except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
     raise OpenRouterError("The AI service could not be reached.") from error
 
+  # OpenRouter reports upstream failures (e.g. provider overload) as HTTP 200 with an error body,
+  # or as a choice that finished with an error and no content.
+  if "error" in response_body:
+    raise OpenRouterError(f"The AI service returned an error: {response_body['error']['message']}")
+
   try:
-    content = response_body["choices"][0]["message"]["content"]
+    choice = response_body["choices"][0]
+    if choice.get("finish_reason") == "error":
+      raise OpenRouterError("The AI service failed while generating a response.")
+    content = choice["message"]["content"]
     parsed = json.loads(content)
     result = ChatResult.model_validate(parsed)
   except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as error:
