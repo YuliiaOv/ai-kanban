@@ -5,10 +5,11 @@ import { sendChatMessage, type ChatMessage } from "@/lib/chatApi";
 import { SendIcon } from "@/components/icons";
 
 type ChatSidebarProps = {
+  boardId: string;
   onBoardUpdated: () => Promise<void>;
 };
 
-export const ChatSidebar = ({ onBoardUpdated }: ChatSidebarProps) => {
+export const ChatSidebar = ({ boardId, onBoardUpdated }: ChatSidebarProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Ask me to shape the board or help plan the next move." },
   ]);
@@ -28,12 +29,15 @@ export const ChatSidebar = ({ onBoardUpdated }: ChatSidebarProps) => {
     setIsSending(true);
     try {
       // History is the earlier turns; the backend appends the current message itself.
-      const response = await sendChatMessage(message, messages);
+      const response = await sendChatMessage(boardId, message, messages);
       setMessages((current) => [...current, { role: "assistant", content: response.message }]);
       if (response.board_updated) {
         await onBoardUpdated();
       }
     } catch (requestError) {
+      // Drop the unanswered turn and give the text back, so the history stays in user/assistant pairs.
+      setMessages(messages);
+      setDraft(message);
       setError(requestError instanceof Error ? requestError.message : "Unable to send the message.");
     } finally {
       setIsSending(false);

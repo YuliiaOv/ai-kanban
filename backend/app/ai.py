@@ -1,16 +1,20 @@
 import json
 import os
 import sqlite3
+from datetime import date
 from typing import Literal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from pydantic import BaseModel, Field, ValidationError
 
-from .database import create_card, delete_card, get_board, update_card
+from .boards import create_card, delete_card, update_card
 
 DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+Priority = Literal["none", "low", "medium", "high"]
 
 
 class BoardOperation(BaseModel):
@@ -19,6 +23,8 @@ class BoardOperation(BaseModel):
     column_id: str | None = None
     title: str | None = Field(default=None, min_length=1)
     details: str | None = None
+    priority: Priority | None = None
+    due_date: date | None = None
     position: int | None = Field(default=None, ge=0)
 
 
@@ -56,13 +62,15 @@ RESPONSE_SCHEMA = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["type", "card_id", "column_id", "title", "details", "position"],
+                "required": ["type", "card_id", "column_id", "title", "details", "priority", "due_date", "position"],
                 "properties": {
                     "type": {"type": "string", "enum": ["create", "update", "move", "delete"]},
                     "card_id": NULLABLE_STRING,
                     "column_id": NULLABLE_STRING,
                     "title": NULLABLE_STRING,
                     "details": NULLABLE_STRING,
+                    "priority": {"type": ["string", "null"], "enum": ["none", "low", "medium", "high", None]},
+                    "due_date": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
                     "position": {"type": ["integer", "null"]},
                 },
             },
@@ -74,9 +82,12 @@ RESPONSE_SCHEMA = {
 def _system_prompt() -> str:
     return (
         "You are a project management assistant. Reply with a user-facing message and a list of board operations. "
-        "Use create with column_id, title, and details; update with card_id and changed fields; "
+        "Use create with column_id, title, and optional details, priority, and due_date; "
+        "update with card_id and only the changed fields; "
         "move with card_id, column_id, and position; delete with card_id. "
-        "Set operation fields that do not apply to null. "
+        "Priority is one of none, low, medium, high. Due dates use YYYY-MM-DD. "
+        f"Today is {date.today().isoformat()}. "
+        "Set operation fields that do not apply or do not change to null. "
         "Use an empty operations array for conversation that does not change the board."
     )
 
@@ -119,7 +130,9 @@ def request_openrouter(board: dict, payload: ChatRequest) -> ChatResult:
     # OpenRouter reports upstream failures (e.g. provider overload) as HTTP 200 with an error body,
     # or as a choice that finished with an error and no content.
     if "error" in response_body:
-        raise OpenRouterError(f"The AI service returned an error: {response_body['error']['message']}")
+        error = response_body["error"]
+        detail = error.get("message", "unknown error") if isinstance(error, dict) else error
+        raise OpenRouterError(f"The AI service returned an error: {detail}")
 
     try:
         choice = response_body["choices"][0]
@@ -133,39 +146,27 @@ def request_openrouter(board: dict, payload: ChatRequest) -> ChatResult:
     return result
 
 
-def apply_operations(connection: sqlite3.Connection, operations: list[BoardOperation]) -> None:
-    """Validate and apply operations on the caller's connection, so they commit or roll back together."""
-    board = get_board(connection)
-    column_ids = {column["id"] for column in board["columns"]}
-    card_ids = set(board["cards"])
-
+def apply_operations(connection: sqlite3.Connection, board_id: str, operations: list[BoardOperation]) -> None:
+    """Apply operations in order on the caller's connection; any invalid one raises, so the caller rolls back all."""
     for operation in operations:
-        if operation.type == "create":
-            if not operation.column_id or not operation.title or operation.column_id not in column_ids:
-                raise OpenRouterError("The AI returned an invalid create operation.")
-        else:
-            if not operation.card_id or operation.card_id not in card_ids:
-                raise OpenRouterError("The AI returned an invalid card operation.")
-            if operation.type == "move" and (
-                not operation.column_id or operation.column_id not in column_ids or operation.position is None
-            ):
-                raise OpenRouterError("The AI returned an invalid move operation.")
-            if operation.type == "update" and all(
-                value is None for value in (operation.title, operation.details, operation.column_id, operation.position)
-            ):
-                raise OpenRouterError("The AI returned an empty update operation.")
-
-    for operation in operations:
-        if operation.type == "create":
-            create_card(connection, operation.column_id, operation.title, operation.details or "")
-        elif operation.type in {"update", "move"}:
-            update_card(
-                connection,
-                operation.card_id,
-                operation.title,
-                operation.details,
-                operation.column_id,
-                operation.position,
-            )
-        elif operation.type == "delete":
-            delete_card(connection, operation.card_id)
+        fields = operation.model_dump(include={"title", "details", "priority", "due_date"}, exclude_none=True)
+        if "due_date" in fields:
+            fields["due_date"] = fields["due_date"].isoformat()
+        try:
+            if operation.type == "create":
+                if not operation.column_id or not operation.title:
+                    raise OpenRouterError("The AI returned an invalid create operation.")
+                create_card(connection, board_id, operation.column_id, **fields)
+            elif not operation.card_id:
+                raise OpenRouterError("The AI returned an operation without a card.")
+            elif operation.type == "delete":
+                delete_card(connection, board_id, operation.card_id)
+            else:
+                if operation.type == "move" and (not operation.column_id or operation.position is None):
+                    raise OpenRouterError("The AI returned an invalid move operation.")
+                changes = {**fields, "column_id": operation.column_id, "position": operation.position}
+                if not any(value is not None for value in changes.values()):
+                    raise OpenRouterError("The AI returned an empty update operation.")
+                update_card(connection, board_id, operation.card_id, changes)
+        except LookupError as error:
+            raise OpenRouterError(f"The AI referred to something that is not on the board: {error}.") from error

@@ -21,7 +21,7 @@ describe("ChatSidebar", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<ChatSidebar onBoardUpdated={refreshBoard} />);
+    render(<ChatSidebar boardId="board-demo" onBoardUpdated={refreshBoard} />);
     await userEvent.type(screen.getByLabelText(/message the board assistant/i), "What should I focus on?");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
 
@@ -48,11 +48,51 @@ describe("ChatSidebar", () => {
       )
     );
 
-    render(<ChatSidebar onBoardUpdated={refreshBoard} />);
+    render(<ChatSidebar boardId="board-demo" onBoardUpdated={refreshBoard} />);
     await userEvent.type(screen.getByLabelText(/message the board assistant/i), "Move card 1 to Review");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
 
     await waitFor(() => expect(refreshBoard).toHaveBeenCalledTimes(1));
     expect(screen.getByText("I moved the card to Review.")).toBeInTheDocument();
   });
+
+  it("posts to the chat endpoint of its board", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(responseFor({ message: "Hi.", board_updated: false }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatSidebar boardId="board-42" onBoardUpdated={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText(/message the board assistant/i), "Hello");
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await screen.findByText("Hi.");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/boards/board-42/chat");
+  });
+
+  it("shows the error and restores the draft when a turn fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        json: async () => ({ detail: "The AI service could not be reached." }),
+      })
+      .mockResolvedValueOnce(responseFor({ message: "Second try worked.", board_updated: false }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatSidebar boardId="board-demo" onBoardUpdated={vi.fn()} />);
+    const input = screen.getByLabelText(/message the board assistant/i);
+    await userEvent.type(input, "Plan my week");
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(await screen.findByText("The AI service could not be reached.")).toBeInTheDocument();
+    expect(input).toHaveValue("Plan my week");
+    expect(screen.queryByText("Plan my week", { selector: "div" })).not.toBeInTheDocument();
+
+    // The retry sends the same history as the first attempt: no dangling user turn.
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+    expect(await screen.findByText("Second try worked.")).toBeInTheDocument();
+    const retryBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(retryBody.history).toHaveLength(1);
+  });
 });
+

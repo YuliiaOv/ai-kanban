@@ -1,6 +1,6 @@
 # Project plan
 
-Status: Parts 1-10 complete; unit, backend, and Playwright end-to-end suites pass.
+Status: Parts 1-13 complete (the MVP, then accounts, multiple boards, column management, and card metadata). Parts 14 onward are planned. Unit, backend, and Playwright end-to-end suites pass.
 
 ## Part 1: Planning and project framing
 
@@ -236,6 +236,84 @@ Success criteria:
 
 ---
 
+## Part 11: Accounts and sessions
+
+Goal: Replace the client-side hardcoded sign-in with real accounts, so the backend is an authentication boundary.
+
+Checklist:
+- [x] Registration with username (3-32 of letters, digits, `._-`, unique case-insensitively), password (8+ characters), and optional display name.
+- [x] Passwords stored as scrypt hashes; sessions as hashed random tokens in an HttpOnly cookie with a 30-day expiry.
+- [x] Sign in, sign out (revokes the session server side), and session restore on reload.
+- [x] Account settings: display name, password change (signs out other sessions), account deletion (cascades to boards).
+- [x] Every data route requires a session (401 otherwise).
+- [x] Versioned migrations (`PRAGMA user_version`); existing MVP databases upgrade in place and the demo `user` / `password` keeps working.
+
+Tests: `backend/tests/test_auth.py`, `test_database.py` (legacy database migrates to exactly the fresh schema, including collation and unique indexes), `frontend/src/app/page.test.tsx`, the account tests in `Workspace.test.tsx`, and the `accounts` group in `frontend/tests/kanban.spec.ts`.
+
+---
+
+## Part 12: Multiple boards per user
+
+Goal: Let each user own many boards and switch between them.
+
+Checklist:
+- [x] `GET/POST /api/boards`, `GET/PATCH/DELETE /api/boards/{id}`; new boards get the five default columns; new users get a starter board.
+- [x] Board list sidebar with card counts, new-board form, and selection; editable board name and description; board deletion with confirmation.
+- [x] Board isolation: other users' boards return 404 on every route, including chat; cards and columns cannot be addressed or moved across boards.
+- [x] The AI chat is scoped to the active board.
+
+Tests: `backend/tests/test_boards_api.py` (isolation and cross-board checks), `Workspace.test.tsx`, and the `boards` group in the Playwright suite.
+
+---
+
+## Part 13: Column management and card metadata
+
+Goal: Make boards fully configurable and cards more informative.
+
+Checklist:
+- [x] Add, reorder (move left/right), and delete columns (deleting removes its cards after confirmation).
+- [x] Card priority (none/low/medium/high) and optional due date, editable inline, with overdue highlighting.
+- [x] Search and priority filter; non-matching cards are dimmed so drag positions stay correct.
+- [x] The AI can set priority and due dates; operations apply in order so later ones see earlier ones.
+- [x] Fixes from the review: drag no longer starts while editing a card (and the edit form is no longer marked `aria-disabled`), stale board refreshes cannot overwrite newer ones, error messages are no longer cleared by the resync, failed chat turns are rolled back from the history, non-object OpenRouter error bodies no longer crash the route.
+
+Tests: `test_boards_api.py`, `test_ai.py`, `KanbanBoard.test.tsx`, `kanban.test.ts`, and the `cards and columns` group in the Playwright suite.
+
+---
+
+## Part 14: Board sharing and card assignees (planned)
+
+Goal: Let a board owner invite other users, and assign cards to board members.
+
+Checklist:
+- [ ] `board_members` table (board, user, role `owner` | `editor` | `viewer`); `require_board` checks membership and role instead of ownership.
+- [ ] Owner can add members by username, change roles, and remove members; members can leave a board.
+- [ ] Viewers get read-only boards (backend enforced, UI hides edit controls).
+- [ ] Card assignee (a board member, optional), shown on the card and filterable.
+- [ ] Tests: role matrix for every route, removal revokes access, UI for member management.
+
+## Part 15: Card detail view, comments, and activity (planned)
+
+- [ ] Card detail dialog with full details, priority, due date, assignee.
+- [ ] Comments on cards (author, timestamp, delete own comment).
+- [ ] Board activity log (card created/moved/edited/deleted, column changes) shown in the board view.
+
+## Part 16: Labels and checklists (planned)
+
+- [ ] Board-level labels with colors; cards carry any number of labels; filter by label.
+- [ ] Card checklist items with completion progress on the card.
+
+## Part 17: Overview dashboard (planned)
+
+- [ ] Home view across all boards: overdue and due-this-week cards, cards assigned to me, per-board progress.
+
+## Part 18: AI and accessibility follow-ups (planned)
+
+- [ ] AI operations for columns and labels; AI sees assignees.
+- [ ] Keyboard card moves (dnd-kit `KeyboardSensor`).
+
+---
+
 ## Notes on implementation order
 
 The work must proceed in the order above. Each phase builds on the previous one and must not skip the required user approval checkpoints for planning, schema approval, and final scope confirmation.
@@ -245,7 +323,8 @@ The implementation should remain intentionally simple, avoid unnecessary abstrac
 ## Current design decisions
 
 - The frontend is built as a Next.js static export and served by FastAPI from the same Docker container; the browser calls backend routes under `/api`.
-- The MVP sign-in remains client-side and in-memory with the hardcoded credentials `user` / `password`. It gates the board experience but is not production authentication or an API security boundary.
+- Authentication is server-side: cookie sessions checked on every data route. Board access is ownership-based until Part 14 adds members.
+- Schema changes go through `MIGRATIONS` in `backend/app/database.py`, with a test that the migrated schema equals the fresh one.
 - SQLite is accessed through Python's standard-library `sqlite3` module. Database initialization creates the schema and seeds the MVP user, one board, five columns, and eight cards when the database is missing.
 - The relational schema is documented in [docs/schema.json](schema.json): users own boards, boards own ordered columns and cards, and card placement is represented by `column_id` plus `position`.
 - The MVP enforces one board per user with a database uniqueness constraint, while retaining user and board ownership fields for future multi-user expansion.

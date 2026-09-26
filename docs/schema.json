@@ -1,198 +1,78 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "database": {
     "engine": "sqlite",
     "filename": "data/app.db",
     "foreignKeys": true,
+    "source": "backend/app/database.py (SCHEMA and MIGRATIONS)",
     "notes": [
       "The database is created automatically when the backend starts if it does not exist.",
-      "The MVP seeds one user and one board for the hardcoded sign-in flow.",
-      "The tables support multiple users and boards even though the MVP uses one board per user."
+      "PRAGMA user_version tracks the schema version; older databases are migrated on startup. Version 1 had no user_version.",
+      "A demo user (user / password) is seeded with one board; registered users get a starter board.",
+      "All timestamps are UTC ISO-8601 strings."
     ]
   },
   "tables": {
     "users": {
-      "purpose": "A future-proof account boundary for board ownership.",
+      "purpose": "Accounts that own boards.",
       "columns": {
-        "id": {
-          "type": "TEXT",
-          "primaryKey": true,
-          "description": "Stable application-generated user identifier."
-        },
-        "username": {
-          "type": "TEXT",
-          "notNull": true,
-          "unique": true,
-          "description": "Login name; unique across users."
-        },
-        "password_hash": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "Stored password hash. The MVP seed may use a placeholder until real authentication is introduced."
-        },
-        "created_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp stored as an ISO-8601 string."
-        }
+        "id": "TEXT primary key",
+        "username": "TEXT not null, unique, COLLATE NOCASE",
+        "display_name": "TEXT not null, default ''; the UI falls back to the username",
+        "password_hash": "TEXT not null; scrypt$<salt hex>$<digest hex>",
+        "created_at": "TEXT not null"
+      }
+    },
+    "sessions": {
+      "purpose": "Signed-in browser sessions; the raw token lives only in the pm_session cookie.",
+      "columns": {
+        "token_hash": "TEXT primary key; SHA-256 of the session token",
+        "user_id": "TEXT not null, references users(id) on delete cascade",
+        "created_at": "TEXT not null",
+        "expires_at": "TEXT not null; 30 days after creation"
       }
     },
     "boards": {
-      "purpose": "A Kanban board owned by one user.",
+      "purpose": "A Kanban board owned by one user; a user may own many.",
       "columns": {
-        "id": {
-          "type": "TEXT",
-          "primaryKey": true,
-          "description": "Stable application-generated board identifier."
-        },
-        "user_id": {
-          "type": "TEXT",
-          "notNull": true,
-          "references": "users.id",
-          "onDelete": "CASCADE",
-          "description": "The board owner."
-        },
-        "name": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "Board display name."
-        },
-        "created_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp stored as an ISO-8601 string."
-        },
-        "updated_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp updated after board mutations."
-        }
-      },
-      "constraints": [
-        "UNIQUE(user_id) for the MVP one-board-per-user rule",
-        "The unique constraint can be removed in a future migration if users may own multiple boards."
-      ]
+        "id": "TEXT primary key",
+        "user_id": "TEXT not null, references users(id) on delete cascade",
+        "name": "TEXT not null",
+        "description": "TEXT not null, default ''",
+        "created_at": "TEXT not null",
+        "updated_at": "TEXT not null; bumped by every board, column, or card change"
+      }
     },
     "columns": {
-      "purpose": "Ordered workflow stages belonging to a board.",
+      "purpose": "Ordered stages of a board.",
       "columns": {
-        "id": {
-          "type": "TEXT",
-          "primaryKey": true,
-          "description": "Stable application-generated column identifier."
-        },
-        "board_id": {
-          "type": "TEXT",
-          "notNull": true,
-          "references": "boards.id",
-          "onDelete": "CASCADE",
-          "description": "The board containing this column."
-        },
-        "title": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "Editable column title."
-        },
-        "position": {
-          "type": "INTEGER",
-          "notNull": true,
-          "description": "Zero-based display order within the board."
-        },
-        "created_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp stored as an ISO-8601 string."
-        },
-        "updated_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp updated after title or position changes."
-        }
+        "id": "TEXT primary key",
+        "board_id": "TEXT not null, references boards(id) on delete cascade",
+        "title": "TEXT not null",
+        "position": "INTEGER not null; 0-based, unique per board",
+        "created_at": "TEXT not null",
+        "updated_at": "TEXT not null"
       },
-      "constraints": [
-        "UNIQUE(board_id, position)",
-        "UNIQUE(board_id, id)"
-      ]
+      "constraints": ["UNIQUE(board_id, position)", "UNIQUE(board_id, id)"]
     },
     "cards": {
-      "purpose": "Editable work items assigned to a board column.",
+      "purpose": "Work items, ordered within a column.",
       "columns": {
-        "id": {
-          "type": "TEXT",
-          "primaryKey": true,
-          "description": "Stable application-generated card identifier."
-        },
-        "board_id": {
-          "type": "TEXT",
-          "notNull": true,
-          "references": "boards.id",
-          "onDelete": "CASCADE",
-          "description": "The board containing this card; supports user and board scoping."
-        },
-        "column_id": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "The current column. Enforced with a composite foreign key to keep cards on the same board."
-        },
-        "title": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "Editable card title."
-        },
-        "details": {
-          "type": "TEXT",
-          "notNull": true,
-          "default": "",
-          "description": "Editable card details."
-        },
-        "position": {
-          "type": "INTEGER",
-          "notNull": true,
-          "description": "Zero-based display order within the column."
-        },
-        "created_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp stored as an ISO-8601 string."
-        },
-        "updated_at": {
-          "type": "TEXT",
-          "notNull": true,
-          "description": "UTC timestamp updated after card mutations."
-        }
+        "id": "TEXT primary key",
+        "board_id": "TEXT not null, references boards(id) on delete cascade",
+        "column_id": "TEXT not null",
+        "title": "TEXT not null",
+        "details": "TEXT not null, default ''",
+        "priority": "TEXT not null, default 'none'; one of none, low, medium, high",
+        "due_date": "TEXT nullable; YYYY-MM-DD",
+        "position": "INTEGER not null; 0-based, unique per column",
+        "created_at": "TEXT not null",
+        "updated_at": "TEXT not null"
       },
       "constraints": [
         "FOREIGN KEY(board_id, column_id) REFERENCES columns(board_id, id) ON DELETE CASCADE",
-        "UNIQUE(column_id, position)",
-        "The composite foreign key prevents assigning a card to a column on another board."
+        "UNIQUE(column_id, position)"
       ]
     }
-  },
-  "relationships": [
-    "users 1-to-many boards, with UNIQUE(boards.user_id) enforcing one board per user for the MVP",
-    "boards 1-to-many columns",
-    "boards 1-to-many cards",
-    "columns 1-to-many cards",
-    "Deleting a user cascades to their boards, columns, and cards"
-  ],
-  "indexes": [
-    "CREATE INDEX idx_boards_user_id ON boards(user_id)",
-    "CREATE INDEX idx_columns_board_position ON columns(board_id, position)",
-    "CREATE INDEX idx_cards_board_column_position ON cards(board_id, column_id, position)"
-  ],
-  "boardMapping": {
-    "frontendBoardData": {
-      "columns": "SELECT id, title, position ORDER BY position; cardIds are derived from cards ordered by position",
-      "cards": "SELECT id, title, details, column_id, position and group by column_id",
-      "moveCard": "Update card.column_id and card.position values in one transaction, then normalize affected positions",
-      "renameColumn": "Update columns.title and updated_at",
-      "createCard": "Insert a card at the end of the target column",
-      "deleteCard": "Delete the card and normalize remaining positions in its column"
-    }
-  },
-  "approval": {
-    "status": "approved",
-    "implementationBlockedUntilApproved": false,
-    "decision": "Approved in Part 5 before database implementation began."
   }
 }

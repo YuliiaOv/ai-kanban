@@ -2,28 +2,31 @@ import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card } from "@/lib/kanban";
+import { PRIORITIES, type Card, type Priority } from "@/lib/kanban";
+import type { CardPayload } from "@/lib/boardApi";
+import { CardMeta } from "@/components/CardMeta";
 import { PencilIcon, TrashIcon } from "@/components/icons";
 
 type KanbanCardProps = {
   card: Card;
+  isDimmed?: boolean;
   onDelete: (cardId: string) => void;
-  onEdit: (cardId: string, title: string, details: string) => void;
+  onEdit: (cardId: string, payload: CardPayload) => void;
 };
 
-export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
+const fieldClass =
+  "w-full rounded-lg border border-[var(--stroke)] px-2.5 py-1.5 outline-none focus:border-[var(--primary-blue)]";
+
+export const KanbanCard = ({ card, isDimmed = false, onDelete, onEdit }: KanbanCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [title, setTitle] = useState(card.title);
-  const [details, setDetails] = useState(card.details);
+  const [draft, setDraft] = useState(card);
 
   // Load the draft from the current card each time, so edits made elsewhere (e.g. by the AI) are not reverted.
   const startEditing = () => {
-    setTitle(card.title);
-    setDetails(card.details);
+    setDraft(card);
     setIsEditing(true);
   };
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: card.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -38,35 +41,65 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
         "group relative rounded-xl border border-[var(--stroke)] bg-white p-3 shadow-[0_4px_12px_rgba(3,33,71,0.06)]",
         "transition-all duration-150",
         "hover:border-[var(--primary-blue)]/40",
-        isDragging && "opacity-60 shadow-[0_18px_32px_rgba(3,33,71,0.16)]"
+        isDragging && "opacity-60 shadow-[0_18px_32px_rgba(3,33,71,0.16)]",
+        isDimmed && "opacity-30"
       )}
-      {...attributes}
-      {...listeners}
+      // No drag handlers while editing, so selecting text in the form does not start a drag.
+      {...(isEditing ? {} : { ...attributes, ...listeners })}
       data-testid={`card-${card.id}`}
+      data-dimmed={isDimmed || undefined}
     >
       {isEditing ? (
         <form
           className="space-y-2"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!title.trim()) return;
-            onEdit(card.id, title.trim(), details.trim());
+            if (!draft.title.trim()) return;
+            onEdit(card.id, {
+              title: draft.title.trim(),
+              details: draft.details.trim(),
+              priority: draft.priority,
+              due_date: draft.due_date || null,
+            });
             setIsEditing(false);
           }}
         >
           <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            value={draft.title}
+            onChange={(event) => setDraft({ ...draft, title: event.target.value })}
             aria-label={`Edit ${card.title} title`}
-            className="w-full rounded-lg border border-[var(--stroke)] px-2.5 py-1.5 text-sm font-semibold text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+            maxLength={200}
+            className={`${fieldClass} text-sm font-semibold text-[var(--navy-dark)]`}
           />
           <textarea
-            value={details}
-            onChange={(event) => setDetails(event.target.value)}
+            value={draft.details}
+            onChange={(event) => setDraft({ ...draft, details: event.target.value })}
             aria-label={`Edit ${card.title} details`}
             rows={3}
-            className="w-full resize-none rounded-lg border border-[var(--stroke)] px-2.5 py-1.5 text-xs leading-5 text-[var(--gray-text)] outline-none focus:border-[var(--primary-blue)]"
+            maxLength={5000}
+            className={`${fieldClass} resize-none text-xs leading-5 text-[var(--gray-text)]`}
           />
+          <div className="flex gap-2">
+            <select
+              value={draft.priority}
+              onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}
+              aria-label={`Edit ${card.title} priority`}
+              className={`${fieldClass} text-xs`}
+            >
+              {PRIORITIES.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority === "none" ? "No priority" : priority}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={draft.due_date ?? ""}
+              onChange={(event) => setDraft({ ...draft, due_date: event.target.value || null })}
+              aria-label={`Edit ${card.title} due date`}
+              className={`${fieldClass} text-xs`}
+            />
+          </div>
           <div className="flex gap-2">
             <button type="submit" className="rounded-full bg-[var(--secondary-purple)] px-3 py-1 text-xs font-semibold text-white">
               Save
@@ -84,6 +117,7 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
           {card.details ? (
             <p className="mt-1 break-words text-xs leading-5 text-[var(--gray-text)]">{card.details}</p>
           ) : null}
+          <CardMeta card={card} />
           {/* Overlay the actions on hover or focus so the title can use the full card width; always shown on touch screens. */}
           <div className="absolute right-1.5 top-1.5 flex rounded-lg border border-[var(--stroke)] bg-white opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
             <button
