@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import type { Card } from "@/lib/kanban";
+import { PencilIcon, TrashIcon } from "@/components/icons";
 
 type KanbanCardProps = {
   card: Card;
@@ -34,8 +35,9 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
       ref={setNodeRef}
       style={style}
       className={clsx(
-        "rounded-2xl border border-transparent bg-white px-4 py-4 shadow-[0_12px_24px_rgba(3,33,71,0.08)]",
+        "group relative rounded-xl border border-[var(--stroke)] bg-white p-3 shadow-[0_4px_12px_rgba(3,33,71,0.06)]",
         "transition-all duration-150",
+        "hover:border-[var(--primary-blue)]/40",
         isDragging && "opacity-60 shadow-[0_18px_32px_rgba(3,33,71,0.16)]"
       )}
       {...attributes}
@@ -44,7 +46,7 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
     >
       {isEditing ? (
         <form
-          className="space-y-3"
+          className="space-y-2"
           onSubmit={(event) => {
             event.preventDefault();
             if (!title.trim()) return;
@@ -56,14 +58,14 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             aria-label={`Edit ${card.title} title`}
-            className="w-full rounded-xl border border-[var(--stroke)] px-3 py-2 text-sm font-semibold text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+            className="w-full rounded-lg border border-[var(--stroke)] px-2.5 py-1.5 text-sm font-semibold text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
           />
           <textarea
             value={details}
             onChange={(event) => setDetails(event.target.value)}
             aria-label={`Edit ${card.title} details`}
             rows={3}
-            className="w-full resize-none rounded-xl border border-[var(--stroke)] px-3 py-2 text-sm text-[var(--gray-text)] outline-none focus:border-[var(--primary-blue)]"
+            className="w-full resize-none rounded-lg border border-[var(--stroke)] px-2.5 py-1.5 text-xs leading-5 text-[var(--gray-text)] outline-none focus:border-[var(--primary-blue)]"
           />
           <div className="flex gap-2">
             <button type="submit" className="rounded-full bg-[var(--secondary-purple)] px-3 py-1 text-xs font-semibold text-white">
@@ -75,34 +77,35 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
           </div>
         </form>
       ) : (
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h4 className="font-display text-base font-semibold text-[var(--navy-dark)]">
-              {card.title}
-            </h4>
-            {card.details ? (
-              <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">{card.details}</p>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 gap-1">
+        <>
+          <h4 className="break-words font-display text-sm font-semibold leading-5 text-[var(--navy-dark)]">
+            {card.title}
+          </h4>
+          {card.details ? (
+            <p className="mt-1 break-words text-xs leading-5 text-[var(--gray-text)]">{card.details}</p>
+          ) : null}
+          {/* Overlay the actions on hover or focus so the title can use the full card width; always shown on touch screens. */}
+          <div className="absolute right-1.5 top-1.5 flex rounded-lg border border-[var(--stroke)] bg-white opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
             <button
               type="button"
               onClick={startEditing}
-              className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+              className="rounded-md p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--primary-blue)]"
               aria-label={`Edit ${card.title}`}
+              title="Edit card"
             >
-              Edit
+              <PencilIcon className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => onDelete(card.id)}
-              className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+              className="rounded-md p-1.5 text-[var(--gray-text)] transition hover:bg-red-50 hover:text-red-600"
               aria-label={`Delete ${card.title}`}
+              title="Delete card"
             >
-              Remove
+              <TrashIcon className="h-4 w-4" />
             </button>
           </div>
-        </div>
+        </>
       )}
     </article>
   );

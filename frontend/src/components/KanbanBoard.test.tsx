@@ -59,14 +59,14 @@ const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 describe("KanbanBoard", () => {
   it("renders five columns", () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard onLogout={() => {}} />);
     return waitFor(() =>
       expect(screen.getAllByTestId(/column-/i)).toHaveLength(5)
     );
   });
 
   it("renames a column", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard onLogout={() => {}} />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
     const column = getFirstColumn();
     const input = within(column).getByLabelText("Column title");
@@ -76,7 +76,7 @@ describe("KanbanBoard", () => {
   });
 
   it("restores the saved column title when it is cleared", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard onLogout={() => {}} />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
     const input = within(getFirstColumn()).getByLabelText("Column title");
     await userEvent.clear(input);
@@ -86,7 +86,7 @@ describe("KanbanBoard", () => {
   });
 
   it("adds and removes a card", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard onLogout={() => {}} />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
     const column = getFirstColumn();
     const addButton = within(column).getByRole("button", {
@@ -114,7 +114,7 @@ describe("KanbanBoard", () => {
   });
 
   it("edits a card and refreshes from the backend", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard onLogout={() => {}} />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
     const column = getFirstColumn();
     const card = within(column).getByTestId("card-card-1");
@@ -131,7 +131,7 @@ describe("KanbanBoard", () => {
   });
 
   it("opens the edit form with the latest card values after a refresh", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard onLogout={() => {}} />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
     const column = getFirstColumn();
     const card = within(column).getByTestId("card-card-1");

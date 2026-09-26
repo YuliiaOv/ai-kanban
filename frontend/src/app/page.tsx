@@ -119,18 +119,5 @@ export default function Home() {
     );
   }
 
-  return (
-    <div className="relative">
-      <div className="absolute right-6 top-6 z-10">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--navy-dark)] shadow-[var(--shadow)] transition hover:border-[var(--primary-blue)]"
-        >
-          Log Out
-        </button>
-      </div>
-      <KanbanBoard />
-    </div>
-  );
+  return <KanbanBoard onLogout={handleLogout} />;
 }

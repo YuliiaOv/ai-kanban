@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { sendChatMessage, type ChatMessage } from "@/lib/chatApi";
+import { SendIcon } from "@/components/icons";
 
 type ChatSidebarProps = {
   onBoardUpdated: () => Promise<void>;
@@ -40,20 +41,19 @@ export const ChatSidebar = ({ onBoardUpdated }: ChatSidebarProps) => {
   };
 
   return (
-    <aside className="flex min-h-[520px] flex-col rounded-[28px] border border-[var(--stroke)] bg-[var(--navy-dark)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-6 lg:h-[calc(100vh-48px)]">
-      <div className="border-b border-white/15 pb-5">
+    <aside className="flex h-[420px] flex-col rounded-2xl bg-[var(--navy-dark)] p-4 text-white shadow-[var(--shadow)] min-[1400px]:h-[calc(100vh-98px)]">
+      <div className="border-b border-white/15 pb-3">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--accent-yellow)]">
           Board assistant
         </p>
-        <h2 className="mt-2 font-display text-2xl font-semibold">Make a move</h2>
-        <p className="mt-2 text-sm leading-6 text-white/60">Create, refine, move, or clear cards with a short request.</p>
+        <p className="mt-1 text-xs leading-5 text-white/60">Create, refine, move, or clear cards with a short request.</p>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto py-5" aria-live="polite">
+      <div className="flex-1 space-y-3 overflow-y-auto py-4" aria-live="polite">
         {messages.map((message, index) => (
           <div
             key={`${message.role}-${index}`}
-            className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+            className={`max-w-[92%] rounded-xl px-3 py-2 text-sm leading-6 ${
               message.role === "user"
                 ? "ml-auto bg-[var(--primary-blue)] text-white"
                 : "bg-white/10 text-white/85"
@@ -65,7 +65,7 @@ export const ChatSidebar = ({ onBoardUpdated }: ChatSidebarProps) => {
         {error ? <p className="rounded-xl border border-red-300/30 bg-red-400/15 px-3 py-2 text-sm text-red-100">{error}</p> : null}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-white/15 pt-5">
+      <form onSubmit={handleSubmit} className="relative border-t border-white/15 pt-3">
         <label htmlFor="chat-message" className="sr-only">Message the board assistant</label>
         <textarea
           id="chat-message"
@@ -73,15 +73,21 @@ export const ChatSidebar = ({ onBoardUpdated }: ChatSidebarProps) => {
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Try: Move QA micro-interactions to Done"
           rows={3}
-          className="w-full resize-none rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-white/45 focus:border-[var(--accent-yellow)]"
+          className="w-full resize-none rounded-xl border border-white/15 bg-white/10 py-2.5 pl-3 pr-12 text-sm text-white outline-none placeholder:text-white/45 focus:border-[var(--accent-yellow)]"
           disabled={isSending}
         />
         <button
           type="submit"
           disabled={isSending || !draft.trim()}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent-yellow)] px-4 py-3 text-sm font-semibold text-[var(--navy-dark)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+          title="Send message"
+          className="absolute bottom-3.5 right-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-yellow)] text-[var(--navy-dark)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {isSending ? "Thinking..." : "Send message"}
+          {isSending ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--navy-dark)] border-t-transparent" />
+          ) : (
+            <SendIcon className="h-4 w-4" />
+          )}
+          <span className="sr-only">{isSending ? "Thinking..." : "Send message"}</span>
         </button>
       </form>
     </aside>

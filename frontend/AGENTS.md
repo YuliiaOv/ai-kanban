@@ -10,6 +10,7 @@ This folder contains the Next.js frontend for the Kanban MVP. It is built as a s
 - components/KanbanCard.tsx: draggable card with inline edit and delete.
 - components/KanbanCardPreview.tsx: preview shown while dragging a card.
 - components/NewCardForm.tsx: form used to create a new card in a column.
+- components/icons.tsx: inline SVG icons (edit, delete, add, send, log out).
 - components/ChatSidebar.tsx: AI chat panel. It sends the current message plus earlier turns to `POST /api/chat` and refreshes the board when `board_updated` is true.
 - lib/boardApi.ts: client for the board routes.
 - lib/chatApi.ts: client for `POST /api/chat`.
